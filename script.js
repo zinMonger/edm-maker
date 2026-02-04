@@ -1,5 +1,13 @@
 // Web Audio API 초기화
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// 전역 오디오 라우팅
+const globalDestination = audioContext.createMediaStreamDestination();
+const globalGain = audioContext.createGain();
+globalGain.gain.value = 1.0;
+globalGain.connect(audioContext.destination);
+globalGain.connect(globalDestination);
+
 let bgmPlaying = false;
 let recording = false;
 let recordedNotes = [];
@@ -91,7 +99,7 @@ function playBeep(frequency, key) {
 
     // 마스터 게인 (전체 볼륨 조절)
     const masterGain = audioContext.createGain();
-    masterGain.connect(audioContext.destination);
+    masterGain.connect(globalGain);
 
     // === 레이어 1: 메인 Saw Wave (풍부한 하모닉스) ===
     const osc1 = audioContext.createOscillator();
@@ -208,7 +216,7 @@ function playBeep(frequency, key) {
 
     masterGain.connect(delay);
     delay.connect(delayGain);
-    delayGain.connect(audioContext.destination);
+    delayGain.connect(globalGain);
     delay.connect(delayFeedback);
     delayFeedback.connect(delay);
 
@@ -438,7 +446,7 @@ function playOneShotBeep(frequency, key) {
     const duration = 0.4;
 
     const masterGain = audioContext.createGain();
-    masterGain.connect(audioContext.destination);
+    masterGain.connect(globalGain);
 
     const osc1 = audioContext.createOscillator();
     const gain1 = audioContext.createGain();
@@ -560,7 +568,7 @@ function playKick() {
     const gainNode = audioContext.createGain();
 
     oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(globalGain);
 
     oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
@@ -594,7 +602,7 @@ function playHihat() {
 
     noise.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(globalGain);
 
     noise.start(audioContext.currentTime);
     noise.stop(audioContext.currentTime + 0.1);
@@ -608,7 +616,7 @@ function playBass(pattern) {
 
     oscillator.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(globalGain);
 
     oscillator.type = 'sawtooth';
     oscillator.frequency.setValueAtTime(pattern[bassIndex % pattern.length], audioContext.currentTime);
@@ -753,9 +761,211 @@ document.getElementById('clearLayersBtn').addEventListener('click', () => {
     }
 });
 
+// ========== SNS 공유 기능 ==========
+
+// MediaRecorder 변수
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecordingAudio = false;
+let audioStream = null;
+
+// 오디오 녹음 시작
+async function startAudioRecording() {
+    try {
+        // 전역 destination의 스트림 사용
+        audioStream = globalDestination.stream;
+
+        // 지원되는 MIME 타입 찾기
+        let mimeType = 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+            mimeType = 'audio/ogg;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+        }
+
+        mediaRecorder = new MediaRecorder(audioStream, {
+            mimeType: mimeType,
+            audioBitsPerSecond: 128000
+        });
+
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
+            downloadAudio(audioBlob, mimeType);
+        };
+
+        mediaRecorder.start();
+        isRecordingAudio = true;
+
+        showShareStatus('🎙️ 오디오 녹음 시작! 음악을 연주하세요...', 'info');
+        document.getElementById('downloadAudioBtn').innerHTML = '⏹<br>녹음<br>중지';
+        document.getElementById('downloadAudioBtn').classList.add('active');
+
+    } catch (error) {
+        console.error('오디오 녹음 시작 실패:', error);
+        showShareStatus('❌ 오디오 녹음을 시작할 수 없습니다.', 'error');
+    }
+}
+
+// 오디오 녹음 중지
+function stopAudioRecording() {
+    if (mediaRecorder && isRecordingAudio) {
+        mediaRecorder.stop();
+        isRecordingAudio = false;
+        document.getElementById('downloadAudioBtn').innerHTML = '🎵<br>오디오<br>다운로드';
+        document.getElementById('downloadAudioBtn').classList.remove('active');
+        showShareStatus('✅ 오디오가 다운로드됩니다!', 'success');
+    }
+}
+
+// 오디오 다운로드
+function downloadAudio(blob, mimeType) {
+    // MIME 타입에 따라 확장자 결정
+    let extension = 'webm';
+    if (mimeType.includes('ogg')) {
+        extension = 'ogg';
+    } else if (mimeType.includes('mp4')) {
+        extension = 'm4a';
+    } else if (mimeType.includes('webm')) {
+        extension = 'webm';
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `edm-beep-maker-${Date.now()}.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// 악보 이미지 캡처
+async function captureSheetMusic() {
+    try {
+        showShareStatus('📸 악보를 캡처하는 중...', 'info');
+
+        const sheetSection = document.querySelector('.sheet-music-section');
+
+        // html2canvas 라이브러리 사용 (CDN에서 동적 로드)
+        if (typeof html2canvas === 'undefined') {
+            await loadHtml2Canvas();
+        }
+
+        const canvas = await html2canvas(sheetSection, {
+            backgroundColor: '#ffffff',
+            scale: 2
+        });
+
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `edm-sheet-music-${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showShareStatus('✅ 악보 이미지가 다운로드되었습니다!', 'success');
+        });
+
+    } catch (error) {
+        console.error('악보 캡처 실패:', error);
+        showShareStatus('❌ 악보를 캡처할 수 없습니다.', 'error');
+    }
+}
+
+// html2canvas 라이브러리 동적 로드
+function loadHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+// Web Share API로 공유
+async function shareContent() {
+    try {
+        if (!navigator.share) {
+            showShareStatus('❌ 이 브라우저는 공유 기능을 지원하지 않습니다.', 'error');
+            return;
+        }
+
+        const shareData = {
+            title: '🎵 EDM Beep Maker',
+            text: '나만의 EDM 비트를 만들어봤어요! 여러분도 한번 만들어보세요!',
+            url: window.location.href
+        };
+
+        await navigator.share(shareData);
+        showShareStatus('✅ 공유되었습니다!', 'success');
+
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            showShareStatus('공유가 취소되었습니다.', 'info');
+        } else {
+            console.error('공유 실패:', error);
+            // 대체 방법: 클립보드에 URL 복사
+            fallbackShare();
+        }
+    }
+}
+
+// 공유 대체 방법 (클립보드 복사)
+async function fallbackShare() {
+    try {
+        await navigator.clipboard.writeText(window.location.href);
+        showShareStatus('✅ 링크가 클립보드에 복사되었습니다!', 'success');
+    } catch (error) {
+        showShareStatus('❌ 공유에 실패했습니다.', 'error');
+    }
+}
+
+// 공유 상태 메시지 표시
+function showShareStatus(message, type) {
+    const statusDiv = document.getElementById('shareStatus');
+    statusDiv.textContent = message;
+    statusDiv.className = `share-status ${type}`;
+    statusDiv.style.display = 'block';
+
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 3000);
+}
+
+// 공유 버튼 이벤트 리스너
+document.getElementById('downloadAudioBtn').addEventListener('click', () => {
+    if (isRecordingAudio) {
+        stopAudioRecording();
+    } else {
+        startAudioRecording();
+    }
+});
+
+document.getElementById('captureSheetBtn').addEventListener('click', () => {
+    captureSheetMusic();
+});
+
+document.getElementById('shareBtn').addEventListener('click', () => {
+    shareContent();
+});
+
 // 시작 메시지
 window.addEventListener('load', () => {
     setTimeout(() => {
-        alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n✨ 새로운 기능:\n- 키를 꾹 누르고 있으면 음이 계속 나옵니다!\n- 루프 녹음으로 Ed Sheeran처럼 레이어를 쌓아보세요!\n\n사용법:\n1. 키보드로 연주하기: Q W E R A S D F\n2. 루프 녹음: 4초 동안 녹음되며 자동으로 반복됩니다\n3. 여러 레이어를 쌓아서 풍부한 사운드를 만드세요!');
+        alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n✨ 새로운 기능:\n- 키를 꾹 누르고 있으면 음이 계속 나옵니다!\n- 루프 녹음으로 Ed Sheeran처럼 레이어를 쌓아보세요!\n- SNS 공유 기능: 음악을 녹음하고 공유하세요!\n\n사용법:\n1. 키보드로 연주하기: Q W E R A S D F\n2. 루프 녹음: 4초 동안 녹음되며 자동으로 반복됩니다\n3. 여러 레이어를 쌓아서 풍부한 사운드를 만드세요!\n4. 오디오 다운로드로 작품을 저장하고 공유하세요!');
     }, 500);
 });

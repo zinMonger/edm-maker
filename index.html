@@ -10,7 +10,31 @@
     <div class="visualizer" id="visualizer"></div>
     <div class="recording-indicator" id="recordingIndicator">● REC</div>
 
-    <div class="container">
+    <div class="app-layout">
+        <!-- 왼쪽 사이드바 - SNS 공유 -->
+        <aside class="left-sidebar">
+            <div class="share-section">
+                <h2>📤 SNS 공유</h2>
+                <p class="share-info">음악을 세상과 공유하세요!</p>
+
+                <div class="share-controls">
+                    <button class="btn share-btn" id="downloadAudioBtn">
+                        🎵<br>오디오<br>다운로드
+                    </button>
+                    <button class="btn share-btn" id="captureSheetBtn">
+                        📸<br>악보<br>캡처
+                    </button>
+                    <button class="btn share-btn" id="shareBtn">
+                        🔗<br>공유하기
+                    </button>
+                </div>
+
+                <div class="share-status" id="shareStatus"></div>
+            </div>
+        </aside>
+
+        <!-- 중앙 메인 컨텐츠 -->
+        <div class="container">
         <h1>🎵 EDM Beep Maker</h1>
         <div class="info">
             키보드를 눌러서 비트를 만들어보세요!<br>
@@ -77,21 +101,24 @@
             <button class="btn" id="playBtn">▶ 재생</button>
             <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
         </div>
+    </div>
 
-        <!-- 루프 레이어 시스템 -->
-        <div class="loop-section">
-            <h2>🔁 루프 레이어 (Ed Sheeran 스타일)</h2>
-            <p class="loop-info">4초 동안 녹음되며 자동으로 반복됩니다. 여러 레이어를 쌓아보세요!</p>
+        <!-- 오른쪽 사이드바 - 루프 레이어 -->
+        <aside class="right-sidebar">
+            <div class="loop-section">
+                <h2>🔁 루프 레이어</h2>
+                <p class="loop-info">4초 동안 녹음되며 자동으로 반복됩니다. 여러 레이어를 쌓아보세요!</p>
 
-            <div class="loop-controls">
-                <button class="btn loop-btn" id="loopRecBtn">🔴 루프 녹음</button>
-                <button class="btn" id="clearLayersBtn">🗑️ 모든 레이어 삭제</button>
+                <div class="loop-controls">
+                    <button class="btn loop-btn" id="loopRecBtn">🔴 루프 녹음</button>
+                    <button class="btn" id="clearLayersBtn">🗑️ 모든 레이어 삭제</button>
+                </div>
+
+                <div class="loop-layers" id="loopLayers">
+                    <!-- 레이어들이 여기에 추가됩니다 -->
+                </div>
             </div>
-
-            <div class="loop-layers" id="loopLayers">
-                <!-- 레이어들이 여기에 추가됩니다 -->
-            </div>
-        </div>
+        </aside>
     </div>
 
     <script src="script.js"></script>
