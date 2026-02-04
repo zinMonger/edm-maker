@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 EDM Beep Maker - Alan Walker Style</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="visualizer" id="visualizer"></div>
+    <div class="recording-indicator" id="recordingIndicator">● REC</div>
+
+    <div class="container">
+        <h1>🎵 EDM Beep Maker</h1>
+        <div class="info">
+            키보드를 눌러서 비트를 만들어보세요!<br>
+            <small>Q W E R A S D F</small>
+        </div>
+
+        <!-- 악보 섹션 -->
+        <div class="sheet-music-section">
+            <h2>🎼 실시간 악보</h2>
+            <div class="staff">
+                <div class="staff-lines">
+                    <div class="treble-clef">𝄞</div>
+                    <div class="staff-line"></div>
+                    <div class="staff-line"></div>
+                    <div class="staff-line"></div>
+                    <div class="staff-line"></div>
+                    <div class="staff-line"></div>
+                    <div class="notes-container"></div>
+                </div>
+            </div>
+            <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                키를 누르면 악보에 음표가 실시간으로 표시됩니다!
+            </p>
+        </div>
+
+        <div class="keyboard">
+            <div class="key" data-key="q" data-note="C">
+                Q
+                <div class="note-label">C</div>
+            </div>
+            <div class="key" data-key="w" data-note="D">
+                W
+                <div class="note-label">D</div>
+            </div>
+            <div class="key" data-key="e" data-note="E">
+                E
+                <div class="note-label">E</div>
+            </div>
+            <div class="key" data-key="r" data-note="F">
+                R
+                <div class="note-label">F</div>
+            </div>
+            <div class="key" data-key="a" data-note="G">
+                A
+                <div class="note-label">G</div>
+            </div>
+            <div class="key" data-key="s" data-note="A">
+                S
+                <div class="note-label">A</div>
+            </div>
+            <div class="key" data-key="d" data-note="B">
+                D
+                <div class="note-label">B</div>
+            </div>
+            <div class="key" data-key="f" data-note="C2">
+                F
+                <div class="note-label">C2</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="bgmBtn">🎼 배경음악 ON/OFF</button>
+            <button class="btn" id="recordBtn">⏺ 녹음</button>
+            <button class="btn" id="playBtn">▶ 재생</button>
+            <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

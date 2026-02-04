@@ -1,0 +1,305 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    overflow-x: hidden;
+}
+
+.container {
+    text-align: center;
+    z-index: 10;
+    max-width: 1200px;
+    width: 100%;
+    padding: 20px;
+}
+
+h1 {
+    font-size: 3em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.info {
+    margin-bottom: 30px;
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+/* 악보 섹션 */
+.sheet-music-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 30px;
+    margin: 30px auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 900px;
+}
+
+.sheet-music-section h2 {
+    color: #667eea;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+}
+
+.staff {
+    position: relative;
+    height: 200px;
+    background: white;
+    margin: 20px 0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.staff-lines {
+    position: relative;
+    height: 100%;
+    padding: 40px 20px;
+}
+
+.staff-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: #333;
+    left: 0;
+}
+
+.staff-line:nth-child(1) { top: 40px; }
+.staff-line:nth-child(2) { top: 70px; }
+.staff-line:nth-child(3) { top: 100px; }
+.staff-line:nth-child(4) { top: 130px; }
+.staff-line:nth-child(5) { top: 160px; }
+
+.treble-clef {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 4em;
+    color: #333;
+    z-index: 10;
+}
+
+.notes-container {
+    position: absolute;
+    left: 80px;
+    top: 0;
+    right: 20px;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.note {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: #667eea;
+    border-radius: 50%;
+    transform: rotate(-20deg);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+    animation: noteAppear 0.3s ease-out;
+}
+
+@keyframes noteAppear {
+    0% {
+        transform: scale(0) rotate(-20deg);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) rotate(-20deg);
+    }
+    100% {
+        transform: scale(1) rotate(-20deg);
+        opacity: 1;
+    }
+}
+
+.note::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    top: -25px;
+    width: 2px;
+    height: 35px;
+    background: #333;
+}
+
+.note.active {
+    background: #ff6b6b;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
+    transform: scale(1.2) rotate(-20deg);
+}
+
+/* 키보드 */
+.keyboard {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin: 40px 0;
+    flex-wrap: wrap;
+}
+
+.key {
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 2em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.key:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px);
+}
+
+.key.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    transform: scale(0.95);
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+}
+
+.key .note-label {
+    font-size: 0.4em;
+    opacity: 0.7;
+    margin-top: 5px;
+}
+
+/* 컨트롤 */
+.controls {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 30px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 15px 30px;
+    font-size: 1.1em;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    font-weight: bold;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn.active {
+    background: #4ade80;
+    border-color: #22c55e;
+}
+
+/* 시각 효과 */
+.visualizer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.wave {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+}
+
+.wave.animate {
+    animation: waveEffect 0.5s ease-out;
+}
+
+@keyframes waveEffect {
+    0% {
+        opacity: 0.5;
+        transform: scale(0.5);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(2);
+    }
+}
+
+/* 녹음 인디케이터 */
+.recording-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background: #ef4444;
+    border-radius: 20px;
+    font-weight: bold;
+    display: none;
+    animation: blink 1s infinite;
+    z-index: 100;
+}
+
+.recording-indicator.active {
+    display: block;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2em;
+    }
+
+    .key {
+        width: 70px;
+        height: 70px;
+        font-size: 1.5em;
+    }
+
+    .sheet-music-section {
+        padding: 15px;
+    }
+
+    .staff {
+        height: 150px;
+    }
+}
