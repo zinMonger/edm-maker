@@ -6,6 +6,26 @@ let recordedNotes = [];
 let recordStartTime = 0;
 let noteIdCounter = 0;
 
+// Sustain 관련 변수
+let activeOscillators = {};
+
+// 루프 시스템 변수
+let loopRecording = false;
+let loopLayers = []; // 녹음된 루프 레이어들
+let loopStartTime = 0;
+let loopDuration = 4000; // 4초 루프
+let currentLoop = [];
+let loopPlaybackIntervals = [];
+let activeLoopLayers = new Set(); // 현재 재생 중인 레이어
+
+// 악보 화음 표시 관련 변수
+let lastNoteTime = 0;
+let currentColumn = 0;
+const CHORD_THRESHOLD = 100; // 100ms 이내에 누른 키는 같은 열로 간주
+
+// 오실레이터 고유 ID
+let oscillatorIdCounter = 0;
+
 // 음계 주파수 매핑 (C5부터 시작)
 const noteFrequencies = {
     'q': 523.25,  // C5
@@ -54,10 +74,20 @@ const keyColors = {
     'f': '#1dd1a1'
 };
 
-// Alan Walker 스타일 신디사이저 비프음 재생
+// Alan Walker 스타일 신디사이저 비프음 재생 (Sustain 버전)
 function playBeep(frequency, key) {
     const now = audioContext.currentTime;
-    const duration = 0.6;
+
+    // 이미 재생 중이면 기존 것을 먼저 정리
+    if (activeOscillators[key]) {
+        const { oscillators } = activeOscillators[key];
+        oscillators.forEach(osc => {
+            try {
+                osc.stop();
+            } catch (e) {}
+        });
+        delete activeOscillators[key];
+    }
 
     // 마스터 게인 (전체 볼륨 조절)
     const masterGain = audioContext.createGain();
@@ -70,20 +100,17 @@ function playBeep(frequency, key) {
 
     osc1.type = 'sawtooth';
     osc1.frequency.setValueAtTime(frequency, now);
-
-    // 디튠으로 풍부함 추가
     osc1.detune.setValueAtTime(5, now);
 
     filter1.type = 'lowpass';
     filter1.frequency.setValueAtTime(300, now);
     filter1.frequency.exponentialRampToValueAtTime(3000, now + 0.1);
-    filter1.frequency.exponentialRampToValueAtTime(800, now + duration);
+    filter1.frequency.setValueAtTime(1500, now + 0.2); // Sustain
     filter1.Q.setValueAtTime(8, now);
 
     gain1.gain.setValueAtTime(0, now);
     gain1.gain.linearRampToValueAtTime(0.15, now + 0.01);
-    gain1.gain.exponentialRampToValueAtTime(0.08, now + 0.15);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gain1.gain.setValueAtTime(0.1, now + 0.15); // Sustain level
 
     osc1.connect(filter1);
     filter1.connect(gain1);
@@ -96,18 +123,17 @@ function playBeep(frequency, key) {
 
     osc2.type = 'sawtooth';
     osc2.frequency.setValueAtTime(frequency, now);
-    osc2.detune.setValueAtTime(-5, now); // 반대 방향 디튠
+    osc2.detune.setValueAtTime(-5, now);
 
     filter2.type = 'lowpass';
     filter2.frequency.setValueAtTime(300, now);
     filter2.frequency.exponentialRampToValueAtTime(3000, now + 0.1);
-    filter2.frequency.exponentialRampToValueAtTime(800, now + duration);
+    filter2.frequency.setValueAtTime(1500, now + 0.2);
     filter2.Q.setValueAtTime(8, now);
 
     gain2.gain.setValueAtTime(0, now);
     gain2.gain.linearRampToValueAtTime(0.15, now + 0.01);
-    gain2.gain.exponentialRampToValueAtTime(0.08, now + 0.15);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gain2.gain.setValueAtTime(0.1, now + 0.15);
 
     osc2.connect(filter2);
     filter2.connect(gain2);
@@ -119,7 +145,7 @@ function playBeep(frequency, key) {
     const filter3 = audioContext.createBiquadFilter();
 
     osc3.type = 'square';
-    osc3.frequency.setValueAtTime(frequency * 2, now); // 1옥타브 위
+    osc3.frequency.setValueAtTime(frequency * 2, now);
 
     filter3.type = 'bandpass';
     filter3.frequency.setValueAtTime(2000, now);
@@ -127,8 +153,7 @@ function playBeep(frequency, key) {
 
     gain3.gain.setValueAtTime(0, now);
     gain3.gain.linearRampToValueAtTime(0.08, now + 0.01);
-    gain3.gain.exponentialRampToValueAtTime(0.04, now + 0.1);
-    gain3.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gain3.gain.setValueAtTime(0.05, now + 0.1);
 
     osc3.connect(filter3);
     filter3.connect(gain3);
@@ -139,12 +164,11 @@ function playBeep(frequency, key) {
     const gainSub = audioContext.createGain();
 
     oscSub.type = 'sine';
-    oscSub.frequency.setValueAtTime(frequency * 0.5, now); // 1옥타브 아래
+    oscSub.frequency.setValueAtTime(frequency * 0.5, now);
 
     gainSub.gain.setValueAtTime(0, now);
     gainSub.gain.linearRampToValueAtTime(0.2, now + 0.01);
-    gainSub.gain.exponentialRampToValueAtTime(0.1, now + 0.15);
-    gainSub.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gainSub.gain.setValueAtTime(0.12, now + 0.15);
 
     oscSub.connect(gainSub);
     gainSub.connect(masterGain);
@@ -178,34 +202,64 @@ function playBeep(frequency, key) {
     const delayGain = audioContext.createGain();
     const delayFeedback = audioContext.createGain();
 
-    delay.delayTime.setValueAtTime(0.125, now); // 1/8 박자 딜레이
+    delay.delayTime.setValueAtTime(0.125, now);
     delayGain.gain.setValueAtTime(0.3, now);
     delayFeedback.gain.setValueAtTime(0.4, now);
 
-    // 딜레이 라우팅
     masterGain.connect(delay);
     delay.connect(delayGain);
     delayGain.connect(audioContext.destination);
     delay.connect(delayFeedback);
     delayFeedback.connect(delay);
 
-    // 모든 오실레이터 시작/종료
+    // 모든 오실레이터 시작
     osc1.start(now);
     osc2.start(now);
     osc3.start(now);
     oscSub.start(now);
     noiseSource.start(now);
 
-    osc1.stop(now + duration);
-    osc2.stop(now + duration);
-    osc3.stop(now + duration);
-    oscSub.stop(now + duration);
+    // 활성 오실레이터 저장 (고유 ID 부여)
+    const oscillatorId = ++oscillatorIdCounter;
+    activeOscillators[key] = {
+        id: oscillatorId,
+        oscillators: [osc1, osc2, osc3, oscSub],
+        gains: [gain1, gain2, gain3, gainSub, masterGain],
+        filters: [filter1, filter2]
+    };
 
     // 시각 효과
     createVisualEffect(key);
 
     // 악보에 음표 추가
     addNoteToStaff(key);
+}
+
+// 음 종료 (키를 뗄 때)
+function stopBeep(key) {
+    if (!activeOscillators[key]) return;
+
+    const now = audioContext.currentTime;
+    const { id, oscillators, gains } = activeOscillators[key];
+
+    // Release 엔벨로프
+    gains.forEach(gain => {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    });
+
+    // 0.3초 후 정리 (단, ID가 같을 때만 - 새로운 음이 시작되지 않았을 때만)
+    setTimeout(() => {
+        if (activeOscillators[key] && activeOscillators[key].id === id) {
+            oscillators.forEach(osc => {
+                try {
+                    osc.stop();
+                } catch (e) {}
+            });
+            delete activeOscillators[key];
+        }
+    }, 350);
 }
 
 // 시각 효과
@@ -225,29 +279,50 @@ function addNoteToStaff(key) {
     note.className = 'note';
     note.id = `note-${noteIdCounter++}`;
 
-    // 음표 위치 설정
     const topPosition = staffPositions[key];
-    const leftPosition = notesContainer.children.length * 50; // 50px 간격
+
+    // 동시에 누른 키들은 같은 열에 표시
+    const now = Date.now();
+    const timeSinceLastNote = now - lastNoteTime;
+
+    if (timeSinceLastNote > CHORD_THRESHOLD) {
+        // 새로운 열 시작
+        currentColumn++;
+    }
+    // 같은 열에 추가 (100ms 이내)
+
+    lastNoteTime = now;
+
+    const leftPosition = currentColumn * 50;
 
     note.style.top = `${topPosition}px`;
     note.style.left = `${leftPosition}px`;
     note.style.background = keyColors[key];
-
-    // 음표 이름 툴팁
     note.title = noteNames[key];
 
     notesContainer.appendChild(note);
 
-    // 활성화 애니메이션
     setTimeout(() => note.classList.add('active'), 10);
     setTimeout(() => note.classList.remove('active'), 300);
 
-    // 악보가 가득 차면 스크롤
     notesContainer.scrollLeft = notesContainer.scrollWidth;
 
-    // 최대 50개 음표만 유지
-    if (notesContainer.children.length > 50) {
-        notesContainer.removeChild(notesContainer.firstChild);
+    // 최대 음표 수 제한 (열 기준으로 조정)
+    const maxColumns = 30;
+    const columns = new Set();
+    Array.from(notesContainer.children).forEach(n => {
+        const left = parseInt(n.style.left);
+        columns.add(left);
+    });
+
+    if (columns.size > maxColumns) {
+        // 가장 오래된 열의 모든 음표 삭제
+        const oldestColumn = Math.min(...columns);
+        Array.from(notesContainer.children).forEach(n => {
+            if (parseInt(n.style.left) === oldestColumn) {
+                notesContainer.removeChild(n);
+            }
+        });
     }
 }
 
@@ -258,24 +333,214 @@ function clearStaff() {
     noteIdCounter = 0;
 }
 
-// 배경음악 (드럼 + 베이스)
+// ========== 루프 시스템 ==========
+
+// 루프 녹음 시작/중지
+function toggleLoopRecording() {
+    if (!loopRecording) {
+        // 녹음 시작
+        loopRecording = true;
+        currentLoop = [];
+        loopStartTime = Date.now();
+
+        document.getElementById('loopRecBtn').classList.add('active');
+        document.getElementById('loopRecBtn').textContent = '⏹ 녹음 중지';
+
+        // 4초 후 자동으로 녹음 종료 및 재생 시작
+        setTimeout(() => {
+            if (loopRecording) {
+                stopLoopRecording();
+            }
+        }, loopDuration);
+    } else {
+        stopLoopRecording();
+    }
+}
+
+// 루프 녹음 중지 및 레이어 추가
+function stopLoopRecording() {
+    loopRecording = false;
+    document.getElementById('loopRecBtn').classList.remove('active');
+    document.getElementById('loopRecBtn').textContent = '🔴 루프 녹음';
+
+    if (currentLoop.length > 0) {
+        // 새로운 레이어 추가
+        const layerId = loopLayers.length;
+        loopLayers.push({
+            id: layerId,
+            notes: [...currentLoop],
+            active: true
+        });
+
+        // UI에 레이어 추가
+        addLayerToUI(layerId);
+
+        // 레이어 재생 시작
+        activeLoopLayers.add(layerId);
+        startLoopPlayback(layerId);
+    }
+
+    currentLoop = [];
+}
+
+// 레이어 UI 추가
+function addLayerToUI(layerId) {
+    const layersContainer = document.getElementById('loopLayers');
+    const layer = document.createElement('div');
+    layer.className = 'loop-layer active';
+    layer.id = `layer-${layerId}`;
+    layer.innerHTML = `
+        <span>레이어 ${layerId + 1} (${loopLayers[layerId].notes.length}음)</span>
+        <div class="layer-controls">
+            <button class="layer-btn toggle-btn" onclick="toggleLayer(${layerId})">ON</button>
+            <button class="layer-btn delete-btn" onclick="deleteLayer(${layerId})">🗑️</button>
+        </div>
+    `;
+    layersContainer.appendChild(layer);
+}
+
+// 레이어 재생
+function startLoopPlayback(layerId) {
+    const layer = loopLayers[layerId];
+    if (!layer) return;
+
+    const playLoop = () => {
+        if (!activeLoopLayers.has(layerId)) return;
+
+        layer.notes.forEach(note => {
+            setTimeout(() => {
+                if (activeLoopLayers.has(layerId)) {
+                    playOneShotBeep(noteFrequencies[note.key], note.key);
+                    activateKey(note.key);
+                }
+            }, note.time);
+        });
+    };
+
+    // 즉시 재생
+    playLoop();
+
+    // 루프 반복
+    const interval = setInterval(() => {
+        if (!activeLoopLayers.has(layerId)) {
+            clearInterval(interval);
+            return;
+        }
+        playLoop();
+    }, loopDuration);
+
+    loopPlaybackIntervals[layerId] = interval;
+}
+
+// One-shot 비프음 (루프용, sustain 없음)
+function playOneShotBeep(frequency, key) {
+    const now = audioContext.currentTime;
+    const duration = 0.4;
+
+    const masterGain = audioContext.createGain();
+    masterGain.connect(audioContext.destination);
+
+    const osc1 = audioContext.createOscillator();
+    const gain1 = audioContext.createGain();
+    const filter1 = audioContext.createBiquadFilter();
+
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(frequency, now);
+    osc1.detune.setValueAtTime(5, now);
+
+    filter1.type = 'lowpass';
+    filter1.frequency.setValueAtTime(300, now);
+    filter1.frequency.exponentialRampToValueAtTime(2500, now + 0.1);
+    filter1.frequency.exponentialRampToValueAtTime(800, now + duration);
+    filter1.Q.setValueAtTime(8, now);
+
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.12, now + 0.01);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc1.connect(filter1);
+    filter1.connect(gain1);
+    gain1.connect(masterGain);
+
+    const osc2 = audioContext.createOscillator();
+    const gain2 = audioContext.createGain();
+
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(frequency * 0.5, now);
+
+    gain2.gain.setValueAtTime(0, now);
+    gain2.gain.linearRampToValueAtTime(0.15, now + 0.01);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc2.connect(gain2);
+    gain2.connect(masterGain);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + duration);
+    osc2.stop(now + duration);
+}
+
+// 레이어 토글
+function toggleLayer(layerId) {
+    const layer = document.getElementById(`layer-${layerId}`);
+    const toggleBtn = layer.querySelector('.toggle-btn');
+
+    if (activeLoopLayers.has(layerId)) {
+        // 비활성화
+        activeLoopLayers.delete(layerId);
+        if (loopPlaybackIntervals[layerId]) {
+            clearInterval(loopPlaybackIntervals[layerId]);
+        }
+        layer.classList.remove('active');
+        toggleBtn.textContent = 'OFF';
+    } else {
+        // 활성화
+        activeLoopLayers.add(layerId);
+        startLoopPlayback(layerId);
+        layer.classList.add('active');
+        toggleBtn.textContent = 'ON';
+    }
+}
+
+// 레이어 삭제
+function deleteLayer(layerId) {
+    activeLoopLayers.delete(layerId);
+    if (loopPlaybackIntervals[layerId]) {
+        clearInterval(loopPlaybackIntervals[layerId]);
+    }
+    document.getElementById(`layer-${layerId}`).remove();
+}
+
+// 모든 레이어 삭제
+function clearAllLayers() {
+    loopLayers.forEach((_, id) => {
+        if (loopPlaybackIntervals[id]) {
+            clearInterval(loopPlaybackIntervals[id]);
+        }
+    });
+    loopLayers = [];
+    activeLoopLayers.clear();
+    loopPlaybackIntervals = [];
+    document.getElementById('loopLayers').innerHTML = '';
+}
+
+// ========== 배경음악 ==========
+
 let bgmIntervals = [];
 function startBackgroundMusic() {
     if (bgmPlaying) return;
     bgmPlaying = true;
     document.getElementById('bgmBtn').classList.add('active');
 
-    // 킥 드럼 (4/4 비트)
     const kickInterval = setInterval(() => {
         playKick();
     }, 500);
 
-    // 하이햇
     const hihatInterval = setInterval(() => {
         playHihat();
     }, 250);
 
-    // 베이스 라인
     const bassInterval = setInterval(() => {
         playBass([80, 80, 100, 120]);
     }, 2000);
@@ -290,7 +555,6 @@ function stopBackgroundMusic() {
     bgmIntervals = [];
 }
 
-// 킥 드럼 사운드
 function playKick() {
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -308,7 +572,6 @@ function playKick() {
     oscillator.stop(audioContext.currentTime + 0.5);
 }
 
-// 하이햇 사운드
 function playHihat() {
     const bufferSize = audioContext.sampleRate * 0.1;
     const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
@@ -327,7 +590,7 @@ function playHihat() {
 
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
 
     noise.connect(filter);
     filter.connect(gainNode);
@@ -337,7 +600,6 @@ function playHihat() {
     noise.stop(audioContext.currentTime + 0.1);
 }
 
-// 베이스 라인
 let bassIndex = 0;
 function playBass(pattern) {
     const oscillator = audioContext.createOscillator();
@@ -355,7 +617,7 @@ function playBass(pattern) {
     filter.frequency.setValueAtTime(300, audioContext.currentTime);
 
     gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.4);
@@ -363,7 +625,8 @@ function playBass(pattern) {
     bassIndex++;
 }
 
-// 키보드 이벤트
+// ========== 키보드 이벤트 ==========
+
 const keyElements = document.querySelectorAll('.key');
 const keyMap = {};
 
@@ -380,6 +643,14 @@ keyElements.forEach(keyEl => {
                 time: Date.now() - recordStartTime
             });
         }
+        if (loopRecording) {
+            currentLoop.push({
+                key: key,
+                time: Date.now() - loopStartTime
+            });
+        }
+        // 클릭 후 바로 놓기
+        setTimeout(() => stopBeep(key), 100);
     });
 });
 
@@ -394,6 +665,12 @@ document.addEventListener('keydown', (e) => {
                 time: Date.now() - recordStartTime
             });
         }
+        if (loopRecording) {
+            currentLoop.push({
+                key: key,
+                time: Date.now() - loopStartTime
+            });
+        }
     }
 });
 
@@ -401,6 +678,7 @@ document.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (keyMap[key]) {
         keyMap[key].classList.remove('active');
+        stopBeep(key);
     }
 });
 
@@ -408,12 +686,15 @@ function activateKey(key) {
     if (keyMap[key]) {
         keyMap[key].classList.add('active');
         setTimeout(() => {
-            keyMap[key].classList.remove('active');
+            if (!activeOscillators[key]) {
+                keyMap[key].classList.remove('active');
+            }
         }, 200);
     }
 }
 
-// 컨트롤 버튼
+// ========== 컨트롤 버튼 ==========
+
 document.getElementById('bgmBtn').addEventListener('click', () => {
     if (bgmPlaying) {
         stopBackgroundMusic();
@@ -448,7 +729,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
     document.getElementById('playBtn').classList.add('active');
     recordedNotes.forEach(note => {
         setTimeout(() => {
-            playBeep(noteFrequencies[note.key], note.key);
+            playOneShotBeep(noteFrequencies[note.key], note.key);
             activateKey(note.key);
         }, note.time);
     });
@@ -462,9 +743,19 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     clearStaff();
 });
 
+document.getElementById('loopRecBtn').addEventListener('click', () => {
+    toggleLoopRecording();
+});
+
+document.getElementById('clearLayersBtn').addEventListener('click', () => {
+    if (confirm('모든 루프 레이어를 삭제하시겠습니까?')) {
+        clearAllLayers();
+    }
+});
+
 // 시작 메시지
 window.addEventListener('load', () => {
     setTimeout(() => {
-        alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n키보드의 Q W E R A S D F 키를 눌러보세요.\n배경음악을 켜고 녹음도 해보세요!\n\n악보에서 실시간으로 음표가 표시됩니다!');
+        alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n✨ 새로운 기능:\n- 키를 꾹 누르고 있으면 음이 계속 나옵니다!\n- 루프 녹음으로 Ed Sheeran처럼 레이어를 쌓아보세요!\n\n사용법:\n1. 키보드로 연주하기: Q W E R A S D F\n2. 루프 녹음: 4초 동안 녹음되며 자동으로 반복됩니다\n3. 여러 레이어를 쌓아서 풍부한 사운드를 만드세요!');
     }, 500);
 });

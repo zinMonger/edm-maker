@@ -18,7 +18,7 @@
         </div>
 
         <!-- 악보 섹션 -->
-        <div class="sheet-music-section">
+        <div class="sheet-music-section">ㅂㅈㄷ
             <h2>🎼 실시간 악보</h2>
             <div class="staff">
                 <div class="staff-lines">
@@ -76,6 +76,21 @@
             <button class="btn" id="recordBtn">⏺ 녹음</button>
             <button class="btn" id="playBtn">▶ 재생</button>
             <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
+        </div>
+
+        <!-- 루프 레이어 시스템 -->
+        <div class="loop-section">
+            <h2>🔁 루프 레이어 (Ed Sheeran 스타일)</h2>
+            <p class="loop-info">4초 동안 녹음되며 자동으로 반복됩니다. 여러 레이어를 쌓아보세요!</p>
+
+            <div class="loop-controls">
+                <button class="btn loop-btn" id="loopRecBtn">🔴 루프 녹음</button>
+                <button class="btn" id="clearLayersBtn">🗑️ 모든 레이어 삭제</button>
+            </div>
+
+            <div class="loop-layers" id="loopLayers">
+                <!-- 레이어들이 여기에 추가됩니다 -->
+            </div>
         </div>
     </div>
 
