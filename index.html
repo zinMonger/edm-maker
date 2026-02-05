@@ -38,7 +38,14 @@
         <h1>🎵 EDM Beep Maker</h1>
         <div class="info">
             키보드를 눌러서 비트를 만들어보세요!<br>
-            <small>Q W E R A S D F</small>
+        </div>
+
+        
+        <div class="controls">
+            <button class="btn" id="bgmBtn">🎼 배경음악 ON/OFF</button>
+            <button class="btn" id="recordBtn">⏺ 녹음</button>
+            <button class="btn" id="playBtn">▶ 재생</button>
+            <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
         </div>
 
         <!-- 악보 섹션 -->
@@ -55,13 +62,13 @@
                     <div class="notes-container"></div>
                 </div>
             </div>
-            <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+            <!-- <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
                 키를 누르면 악보에 음표가 실시간으로 표시됩니다!
-            </p>
+            </p> -->
         </div>
 
         <div class="keyboard">
-            <div class="key" data-key="q" data-note="C">
+                 <div class="key" data-key="q" data-note="C">
                 Q
                 <div class="note-label">C</div>
             </div>
@@ -77,10 +84,10 @@
                 R
                 <div class="note-label">F</div>
             </div>
-            <div class="key" data-key="a" data-note="G">
+                 <div class="key" data-key="a" data-note="G">
                 A
                 <div class="note-label">G</div>
-            </div>
+            </div> 
             <div class="key" data-key="s" data-note="A">
                 S
                 <div class="note-label">A</div>
@@ -89,18 +96,13 @@
                 D
                 <div class="note-label">B</div>
             </div>
-            <div class="key" data-key="f" data-note="C2">
+            <div class="key" data-key="f" data-note="C2"> 
                 F
                 <div class="note-label">C2</div>
             </div>
+           
         </div>
 
-        <div class="controls">
-            <button class="btn" id="bgmBtn">🎼 배경음악 ON/OFF</button>
-            <button class="btn" id="recordBtn">⏺ 녹음</button>
-            <button class="btn" id="playBtn">▶ 재생</button>
-            <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
-        </div>
     </div>
 
         <!-- 오른쪽 사이드바 - 루프 레이어 -->

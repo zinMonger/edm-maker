@@ -10,3 +10,14 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local

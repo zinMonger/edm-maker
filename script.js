@@ -513,11 +513,24 @@ function toggleLayer(layerId) {
 
 // 레이어 삭제
 function deleteLayer(layerId) {
+    console.log(`레이어 ${layerId} 삭제`);
+
+    // 재생 중지
     activeLoopLayers.delete(layerId);
     if (loopPlaybackIntervals[layerId]) {
         clearInterval(loopPlaybackIntervals[layerId]);
     }
-    document.getElementById(`layer-${layerId}`).remove();
+
+    // 배열에서 제거 (null로 설정하여 인덱스 유지)
+    if (loopLayers[layerId]) {
+        loopLayers[layerId] = null;
+    }
+
+    // UI에서 제거
+    const layerEl = document.getElementById(`layer-${layerId}`);
+    if (layerEl) {
+        layerEl.remove();
+    }
 }
 
 // 모든 레이어 삭제
@@ -898,26 +911,62 @@ function loadHtml2Canvas() {
 
 // Web Share API로 공유
 async function shareContent() {
+    console.log('공유 시작');
+    console.log('현재 상태:', {
+        recordedNotes: recordedNotes.length,
+        loopLayers: loopLayers.filter(l => l != null).length
+    });
+
+    // 빈 데이터 체크
+    if (recordedNotes.length === 0 && loopLayers.filter(l => l != null).length === 0) {
+        console.warn('공유할 음악이 없습니다');
+        showShareStatus('⚠️ 먼저 음악을 만들어주세요!', 'error');
+        return;
+    }
+
+    const shareUrl = generateShareURL();
+
+    if (!shareUrl) {
+        console.error('공유 URL 생성 실패');
+        showShareStatus('❌ 공유 URL을 생성할 수 없습니다.', 'error');
+        return;
+    }
+
+    console.log('공유 URL:', shareUrl);
+    console.log('프로토콜:', window.location.protocol);
+
+    // file:// 프로토콜 체크
+    if (window.location.protocol === 'file:') {
+        console.warn('file:// 프로토콜에서는 Web Share API를 사용할 수 없습니다');
+        showShareStatus('⚠️ 로컬 파일 모드: 클립보드에 복사합니다', 'info');
+        fallbackShare();
+        return;
+    }
+
     try {
-        if (!navigator.share) {
-            showShareStatus('❌ 이 브라우저는 공유 기능을 지원하지 않습니다.', 'error');
-            return;
+        if (navigator.share) {
+            console.log('Web Share API 사용 시도');
+            await navigator.share({
+                title: '🎵 EDM Beep Maker',
+                text: '나만의 EDM 비트를 만들어봤어요! 들어보세요!',
+                url: shareUrl
+            });
+            console.log('Web Share API 성공');
+            showShareStatus('✅ 공유되었습니다!', 'success');
+        } else {
+            // Web Share API 미지원 시 클립보드에 복사
+            console.log('Web Share API 미지원 - 클립보드 복사 사용');
+            await navigator.clipboard.writeText(shareUrl);
+            showShareStatus('✅ 링크가 클립보드에 복사되었습니다!', 'success');
         }
-
-        const shareData = {
-            title: '🎵 EDM Beep Maker',
-            text: '나만의 EDM 비트를 만들어봤어요! 여러분도 한번 만들어보세요!',
-            url: window.location.href
-        };
-
-        await navigator.share(shareData);
-        showShareStatus('✅ 공유되었습니다!', 'success');
-
     } catch (error) {
         if (error.name === 'AbortError') {
+            console.log('공유 취소됨');
             showShareStatus('공유가 취소되었습니다.', 'info');
         } else {
             console.error('공유 실패:', error);
+            console.error('에러 이름:', error.name);
+            console.error('에러 메시지:', error.message);
             // 대체 방법: 클립보드에 URL 복사
             fallbackShare();
         }
@@ -927,11 +976,153 @@ async function shareContent() {
 // 공유 대체 방법 (클립보드 복사)
 async function fallbackShare() {
     try {
-        await navigator.clipboard.writeText(window.location.href);
-        showShareStatus('✅ 링크가 클립보드에 복사되었습니다!', 'success');
+        const shareUrl = generateShareURL();
+        if (shareUrl) {
+            await navigator.clipboard.writeText(shareUrl);
+            showShareStatus('✅ 링크가 클립보드에 복사되었습니다!', 'success');
+        } else {
+            showShareStatus('❌ 공유에 실패했습니다.', 'error');
+        }
     } catch (error) {
         showShareStatus('❌ 공유에 실패했습니다.', 'error');
     }
+}
+
+// 현재 상태를 URL로 변환
+function generateShareURL() {
+    // undefined나 null 레이어 필터링
+    const validLayers = loopLayers.filter(layer => layer != null);
+
+    console.log('공유 데이터 생성:', {
+        recordedNotes: recordedNotes.length,
+        loopLayers: validLayers.length
+    });
+
+    const shareData = {
+        version: "1.0",
+        recordedNotes: recordedNotes,
+        loopLayers: validLayers.map(layer => ({
+            id: layer.id,
+            notes: layer.notes,
+            active: layer.active
+        })),
+        metadata: {
+            createdAt: new Date().toISOString(),
+            loopDuration: loopDuration
+        }
+    };
+
+    try {
+        const jsonString = JSON.stringify(shareData);
+        console.log('JSON 크기:', jsonString.length, 'bytes');
+
+        const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+        const shareUrl = `${window.location.origin}${window.location.pathname}?music=${encoded}`;
+
+        console.log('공유 URL 생성 성공:', shareUrl.length, '글자');
+        return shareUrl;
+    } catch (error) {
+        console.error('URL 생성 실패:', error);
+        return null;
+    }
+}
+
+// URL 파라미터에서 음악 데이터 로드
+function loadMusicFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get('music');
+
+    if (!encoded) {
+        console.log('URL에 음악 데이터가 없습니다.');
+        return false;
+    }
+
+    console.log('공유 URL에서 음악 로드 중...', 'URL 길이:', encoded.length);
+
+    try {
+        // Base64 디코딩
+        const decoded = atob(encoded);
+        console.log('Base64 디코딩 완료:', decoded.length, 'bytes');
+
+        // URL 디코딩
+        const jsonString = decodeURIComponent(escape(decoded));
+        console.log('URL 디코딩 완료');
+
+        // JSON 파싱
+        const data = JSON.parse(jsonString);
+        console.log('JSON 파싱 완료:', data);
+
+        // 버전 체크
+        if (data.version !== "1.0") {
+            console.warn('지원하지 않는 버전:', data.version);
+            showShareStatus('⚠️ 지원하지 않는 버전입니다.', 'error');
+            return false;
+        }
+
+        // 데이터 복원
+        recordedNotes = data.recordedNotes || [];
+        loopLayers = data.loopLayers || [];
+
+        console.log('데이터 복원:', {
+            recordedNotes: recordedNotes.length,
+            loopLayers: loopLayers.length
+        });
+
+        // 루프 레이어 UI 복원
+        restoreLoopLayers();
+
+        showShareStatus('🎵 공유된 음악을 불러왔습니다!', 'success');
+        return true;
+    } catch (error) {
+        console.error('음악 데이터 로드 실패:', error);
+        console.error('에러 스택:', error.stack);
+        showShareStatus(`❌ 로드 실패: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// 루프 레이어 UI 복원
+function restoreLoopLayers() {
+    const layersContainer = document.getElementById('loopLayers');
+    layersContainer.innerHTML = '';
+    activeLoopLayers.clear();
+
+    console.log('루프 레이어 복원 시작:', loopLayers.length, '개');
+
+    loopLayers.forEach((layer, index) => {
+        // undefined나 null 레이어 건너뛰기
+        if (!layer || !layer.notes) {
+            console.warn(`레이어 ${index} 건너뜀 (유효하지 않음)`);
+            return;
+        }
+
+        console.log(`레이어 ${layer.id} 복원 중:`, layer.notes.length, '음');
+
+        try {
+            addLayerToUI(layer.id);
+
+            // 활성 상태 복원
+            if (layer.active) {
+                activeLoopLayers.add(layer.id);
+                startLoopPlayback(layer.id);
+                console.log(`레이어 ${layer.id} 활성화 및 재생 시작`);
+            } else {
+                const layerEl = document.getElementById(`layer-${layer.id}`);
+                if (layerEl) {
+                    layerEl.classList.remove('active');
+                    const toggleBtn = layerEl.querySelector('.toggle-btn');
+                    if (toggleBtn) {
+                        toggleBtn.textContent = 'OFF';
+                    }
+                }
+                console.log(`레이어 ${layer.id} 비활성 상태로 복원`);
+            }
+        } catch (error) {
+            console.error(`레이어 ${layer.id} 복원 실패:`, error);
+        }
+    });
+
+    console.log('루프 레이어 복원 완료');
 }
 
 // 공유 상태 메시지 표시
@@ -965,7 +1156,18 @@ document.getElementById('shareBtn').addEventListener('click', () => {
 
 // 시작 메시지
 window.addEventListener('load', () => {
-    setTimeout(() => {
-        alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n✨ 새로운 기능:\n- 키를 꾹 누르고 있으면 음이 계속 나옵니다!\n- 루프 녹음으로 Ed Sheeran처럼 레이어를 쌓아보세요!\n- SNS 공유 기능: 음악을 녹음하고 공유하세요!\n\n사용법:\n1. 키보드로 연주하기: Q W E R A S D F\n2. 루프 녹음: 4초 동안 녹음되며 자동으로 반복됩니다\n3. 여러 레이어를 쌓아서 풍부한 사운드를 만드세요!\n4. 오디오 다운로드로 작품을 저장하고 공유하세요!');
-    }, 500);
+    // URL에서 음악 데이터 로드 시도
+    const loaded = loadMusicFromURL();
+
+    // 공유된 음악이 아닌 경우에만 환영 메시지 표시
+    if (!loaded) {
+        setTimeout(() => {
+            alert('🎵 EDM Beep Maker에 오신 것을 환영합니다!\n\n✨ 새로운 기능:\n- 키를 꾹 누르고 있으면 음이 계속 나옵니다!\n- 루프 녹음으로 Ed Sheeran처럼 레이어를 쌓아보세요!\n- SNS 공유 기능: 음악을 녹음하고 공유하세요!\n- URL로 음악 공유: 링크만으로 즉시 재생!\n\n사용법:\n1. 키보드로 연주하기: Q W E R A S D F\n2. 루프 녹음: 4초 동안 녹음되며 자동으로 반복됩니다\n3. 여러 레이어를 쌓아서 풍부한 사운드를 만드세요!\n4. 오디오 다운로드로 작품을 저장하고 공유하세요!\n5. 공유하기 버튼으로 링크를 생성하고 친구들과 공유하세요!');
+        }, 500);
+    } else {
+        // 로드된 음악이 있으면 안내 메시지만 표시
+        setTimeout(() => {
+            alert('🎵 공유된 EDM 비트를 불러왔습니다!\n\n▶ 재생 버튼을 눌러 녹음된 음악을 들어보세요!\n🔁 루프 레이어가 있다면 자동으로 재생됩니다.\n\n💡 팁: 직접 키보드로 연주하거나 녹음을 추가할 수도 있습니다!');
+        }, 500);
+    }
 });
