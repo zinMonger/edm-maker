@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>공유 기능 디버깅</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .info { background: #e3f2fd; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 SNS 공유 기능 디버깅</h1>
+
+    <div class="info">
+        <h3>현재 상태 확인</h3>
+        <button onclick="checkStatus()">상태 확인</button>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        function checkStatus() {
+            const output = document.getElementById('output');
+
+            // 원본 페이지의 콘솔에서 실행할 코드를 보여줌
+            output.textContent = `
+브라우저 콘솔(F12)에서 다음을 입력하세요:
+
+// 1. 녹음된 음악 확인
+console.log('녹음된 음악:', recordedNotes.length, '개');
+console.log('루프 레이어:', loopLayers.filter(l => l != null).length, '개');
+
+// 2. 전체 데이터 확인
+console.log('recordedNotes:', recordedNotes);
+console.log('loopLayers:', loopLayers);
+
+// 3. 공유 함수 직접 호출 테스트
+shareContent();
+
+--------------------
+예상 결과:
+- recordedNotes.length > 0 또는 loopLayers.length > 0 이어야 함
+- 둘 다 0이면 "먼저 음악을 만들어주세요!" 메시지 표시됨
+            `;
+        }
+
+        checkStatus();
+    </script>
+</body>
+</html>

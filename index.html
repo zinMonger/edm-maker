@@ -27,11 +27,40 @@
                     <button class="btn share-btn" id="shareBtn">
                         🔗<br>공유하기
                     </button>
+                    <button class="btn share-btn" id="debugBtn" style="background: #9c27b0;">
+                        🐛<br>디버그
+                    </button>
                 </div>
 
                 <div class="share-status" id="shareStatus"></div>
             </div>
         </aside>
+
+    <!-- 공유 URL 모달 -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <h2>🔗 공유 링크 생성 완료!</h2>
+            <p style="color: white; margin-bottom: 15px;">아래 링크를 복사하거나 새 창에서 열어보세요.</p>
+
+            <div class="url-container">
+                <input type="text" id="shareUrlInput" readonly />
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn primary" id="copyUrlBtn">
+                    📋 URL 복사
+                </button>
+                <button class="modal-btn success" id="openNewTabBtn">
+                    🔗 새 창에서 열기
+                </button>
+                <button class="modal-btn" id="closeModalBtn">
+                    닫기
+                </button>
+            </div>
+
+            <div id="copyStatus" class="copy-status"></div>
+        </div>
+    </div>
 
         <!-- 중앙 메인 컨텐츠 -->
         <div class="container">
@@ -42,9 +71,9 @@
 
         
         <div class="controls">
-            <button class="btn" id="bgmBtn">🎼 배경음악 ON/OFF</button>
             <button class="btn" id="recordBtn">⏺ 녹음</button>
             <button class="btn" id="playBtn">▶ 재생</button>
+            <button class="btn" id="bgmBtn">🎼 배경음악 ON/OFF</button>
             <button class="btn" id="clearBtn">🗑️ 악보 지우기</button>
         </div>
 
@@ -123,6 +152,10 @@
         </aside>
     </div>
 
-    <script src="script.js"></script>
+    <!-- 모듈 로드 (순서 중요!) -->
+    <script src="js/constants.js"></script>
+    <script src="js/audio-context.js"></script>
+    <script src="js/synth.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
